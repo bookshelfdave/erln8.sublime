@@ -21,16 +21,55 @@
 
 import os
 from os.path import dirname
-import sys
+import subprocess
 from subprocess import Popen
 import sublime, sublime_plugin
 
-class Erln8Command(sublime_plugin.EventListener):
+def doit(listindex):
+	return True
+
+def e8(cwd, erln8, cmd_list):
+	sublime.status_message(cwd)
+	try:
+		p = subprocess.Popen([erln8] + cmd_list, cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		out,err=p.communicate()
+		if err != "":
+			sublime.error_message("Erln8 error: " + err)
+			return "error"
+		else:
+			cmd_output = out.strip()
+			return cmd_output
+	except Exception as e:
+		s = str(e)
+		sublime.error_message("Erln8 error: %s" % s)
+		return "error"
+
+
+class Erln8buildableCommand(sublime_plugin.WindowCommand):
+	def run(self):
+		erln8_exe=self.window.active_view().settings().get('erln8_path','/usr/local/bin/erln8')
+		output = e8("/", erln8_exe, ["--buildable"])
+		items = output.split("\n")
+		#sublime.message_dialog(output)
+		self.window.show_quick_panel(items, doit)
+
+	def description(self):
+		return "Erln8Buildable"
+
+class Erln8listCommand(sublime_plugin.WindowCommand):
+	def run(self):
+		erln8_exe=self.window.active_view().settings().get('erln8_path','/usr/local/bin/erln8')
+		output = e8("/", erln8_exe, ["--list"])
+		items = output.split("\n")
+		self.window.show_quick_panel(items, doit)
+
+
+class Erln8Listener(sublime_plugin.EventListener):
 	def on_post_save(self, view):
-		erln8_exe=view.settings().get('erln8_path','/usr/local/bin/erln8')		
+		erln8_exe=view.settings().get('erln8_path','/usr/local/bin/erln8')
 		p = view.file_name()
 		d = dirname(p)
-		erl_version = self.erln8_exec(d, erln8_exe, ["--show"])		
+		erl_version = self.erln8_exec(d, erln8_exe, ["--show"])
 		view.set_status("erln8", "erln8: " + erl_version)
 
 	def erln8_exec(self, cwd, erln8, cmd_list):
